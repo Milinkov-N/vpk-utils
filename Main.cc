@@ -6,6 +6,58 @@
 #include "vpk-utils/utility.h"
 #include "vpk-utils/Application.h"
 
+
+class Timer
+{
+public:
+	using SysClock = std::chrono::system_clock;
+	template<class T>
+	using TimePoint = std::chrono::time_point<T>;
+
+public:
+	auto Start() -> void;
+	auto Stop() -> void;
+	auto ElapsedMilliseconds() -> int64_t;
+	auto TimeMillis(std::function<void()> callback) -> int64_t;
+
+private:
+	TimePoint<SysClock> start_;
+	TimePoint<SysClock> end_;
+	bool running_{ false };
+};
+
+auto Timer::Start() -> void
+{
+	start_ = SysClock::now();
+	running_ = true;
+}
+
+auto Timer::Stop() -> void
+{
+	end_ = SysClock::now();
+	running_ = false;
+}
+
+auto Timer::ElapsedMilliseconds() -> int64_t
+{
+	TimePoint<SysClock> end_time;
+
+	if (running_)
+		end_time = SysClock::now();
+	else
+		end_time = end_;
+
+	return std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_).count();
+}
+
+auto Timer::TimeMillis(std::function<void()> callback) -> int64_t
+{
+	Start();
+	callback();
+	Stop();
+	return ElapsedMilliseconds();
+}
+
 class Usage
 {
 public:
@@ -38,6 +90,7 @@ namespace flags
 	constexpr auto WORKDIR   = args::FlagSpec("workdir", "w", true);
 	constexpr auto SUBDIR    = args::FlagSpec("subdir", "s", true);
 	constexpr auto VERBOSE   = args::FlagSpec("verbose", "v");
+	constexpr auto EXEC_TIME = args::FlagSpec("exec-time", "t");
 	constexpr auto HELP      = args::FlagSpec("help", "h");
 }  // namespace flags
 
@@ -53,16 +106,12 @@ auto main(int argc, char** argv) -> int
 		auto [workdir_isset, workdir] = args.FindArg(flags::WORKDIR);
 		auto [subdir_isset, subdir] = args.FindArg(flags::SUBDIR);
 		auto [verbose_isset, _] = args.FindArg(flags::VERBOSE);
-		auto [help_isset, __] = args.FindArg(flags::HELP);
+		auto [time_exec_isset, _te] = args.FindArg(flags::EXEC_TIME);
+		auto [help_isset, _h] = args.FindArg(flags::HELP);
 
-		if (help_isset)
+		if (help_isset || argc < 2)
 		{
-			Usage usage = {
-				flags::WORKDIR,
-				flags::SUBDIR,
-				flags::VERBOSE,
-				flags::HELP
-			};
+			Usage usage = { flags::WORKDIR, flags::SUBDIR, flags::VERBOSE, flags::HELP };
 			
 			std::cout << Application::about() << "\n\n";
 			std::cout << usage;
@@ -76,7 +125,12 @@ auto main(int argc, char** argv) -> int
 
 		if (subdir_isset) app.SetSubDir(subdir.value());
 
-		return app.Exec();
+		Timer timer;
+		int status = 0;
+		auto millis = timer.TimeMillis([&] { status = app.Exec(); });
+		if (time_exec_isset) std::cout << "Finished in " << millis << "ms\n";
+
+		return status;
 	}
 	catch (const std::exception& e)
 	{

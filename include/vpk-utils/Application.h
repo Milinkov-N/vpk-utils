@@ -29,7 +29,7 @@ public:
 			localtime_s(&tminfo, &current_time);
 			int current_year = tminfo.tm_year + 1900;
 
-			os  << about::NAME
+			os << about::NAME
 				<< " v" << about::VERSION << ". "
 				<< about::LICENSE
 				<< ".\nDeveloped by " << about::AUTHOR << " (" << current_year << ')';
@@ -135,7 +135,11 @@ private:
 	{
 		size_t n = 0;
 		auto dir_it = std::filesystem::directory_iterator(dir);
-		std::for_each(dir_it, std::filesystem::directory_iterator(), [&](const auto& entry)
+		std::vector<std::filesystem::directory_entry> entries;
+
+		for (const auto& entry : dir_it) entries.push_back(entry);
+
+		std::for_each(entries.cbegin(), entries.cend(), [&](const auto& entry)
 			{
 				if (entry.path().extension().string() == file_ext)
 				{
@@ -148,7 +152,7 @@ private:
 					auto old_path = dir / old_name;
 					auto new_path = dir / new_name;
 
-					// std::filesystem::rename(old_path, new_path);
+					std::filesystem::rename(old_path, new_path);
 					// cb(old_name, new_name);
 					if (verbose_output_)
 						std::cout << "\t" << old_name << "\t-->\t" << new_name << std::endl;
