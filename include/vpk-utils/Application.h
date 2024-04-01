@@ -12,27 +12,69 @@
 #include "vpk-utils/args.h"
 #include "vpk-utils/utility.h"
 
+class Timer
+{
+public:
+	using SysClock = std::chrono::system_clock;
+	template<class T>
+	using TimePoint = std::chrono::time_point<T>;
+
+public:
+	auto Start() -> void;
+	auto Stop() -> void;
+	auto ElapsedMilliseconds() -> int64_t;
+
+private:
+	TimePoint<SysClock> start_;
+	TimePoint<SysClock> end_;
+	bool running_{ false };
+};
+
+auto Timer::Start() -> void
+{
+	start_ = SysClock::now();
+	running_ = true;
+}
+
+auto Timer::Stop() -> void
+{
+	end_ = SysClock::now();
+	running_ = false;
+}
+
+auto Timer::ElapsedMilliseconds() -> int64_t
+{
+	TimePoint<SysClock> end_time;
+
+	if (running_)
+		end_time = SysClock::now();
+	else
+		end_time = end_;
+
+	return std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_).count();
+}
+
 class Application
 {
 public:
-	struct about
+	struct About
 	{
 		static constexpr auto NAME = "vpk-utils";
-		static constexpr auto VERSION = "0.2.0";
+		static constexpr auto VERSION = "0.2.1";
 		static constexpr auto AUTHOR = "Nikita Milinkov";
 		static constexpr auto LICENSE = "MIT Licence";
 
-		friend auto operator<<(std::ostream& os, const about& a) -> std::ostream&
+		friend auto operator<<(std::ostream& os, const About& a) -> std::ostream&
 		{
 			auto current_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 			tm tminfo{ 0 };
 			localtime_s(&tminfo, &current_time);
 			int current_year = tminfo.tm_year + 1900;
 
-			os << about::NAME
-				<< " v" << about::VERSION << ". "
-				<< about::LICENSE
-				<< ".\nDeveloped by " << about::AUTHOR << " (" << current_year << ')';
+			os << About::NAME
+				<< " v" << About::VERSION << "  "
+				<< About::LICENSE
+				<< ".\nDeveloped by " << About::AUTHOR << " (" << current_year << ')';
 			return os;
 		}
 	};
@@ -56,6 +98,11 @@ public:
 		verbose_output_ = verbose;
 	}
 
+	inline auto SetMeasureExecTime(bool measure) noexcept -> void
+	{
+		measure_exec_time_ = measure;
+	}
+
 	inline auto GetFullPath() const noexcept -> std::string
 	{
 		return subdir_.has_value()
@@ -65,6 +112,7 @@ public:
 
 	inline auto Exec() -> int
 	{
+		Timer timer;
 		std::cout << "Select directory:\n";
 		auto dirs = ListAvailableDirectories_();
 
@@ -78,9 +126,16 @@ public:
 			std::cout << std::endl;
 		};
 
+		timer.Start();
+
 		log_results("\\ JPG Files:", [&]
 			{
 				return RenameAllFilesInDir_(chosen_dir_path);
+			});
+
+		log_results("\\ PSD Files:", [&]
+			{
+				return RenameAllFilesInDir_(chosen_dir_path, {}, "", ".psd");
 			});
 
 		log_results("\\BP JPG Files:", [&]
@@ -92,6 +147,11 @@ public:
 			{
 				return RenameAllFilesInDir_(chosen_dir_path / "DM", chosen_dir_path.filename().string(), " дм");
 			});
+
+		timer.Stop();
+
+		if (measure_exec_time_)
+			std::cout << "Finished in " << timer.ElapsedMilliseconds() << "ms\n";
 
 		return 0;
 	}
@@ -118,55 +178,54 @@ private:
 	inline auto ConstructNewFilename_(
 		const std::string& old_name,
 		const std::string& new_name,
-		std::string_view suffix = ""
+		std::string_view suffix = "",
+		std::string_view ext = ".jpg"
 	) -> std::string
 	{
 		auto idx = utl::vpk::get_jpg_file_idx(old_name);
-		return new_name + "_" + idx + suffix.data() + ".jpg";
+		return new_name + "_" + idx + suffix.data() + ext.data();
 	}
 
 	inline auto RenameAllFilesInDir_(
 		const std::filesystem::path& dir,
-		// std::function<void(std::string_view, std::string_view)> cb,
 		std::optional<std::string> name = {},
 		std::string_view suffix = "",
 		std::string_view file_ext = ".jpg"
 	) -> size_t
 	{
-		size_t n = 0;
 		auto dir_it = std::filesystem::directory_iterator(dir);
 		std::vector<std::filesystem::directory_entry> entries;
 
-		for (const auto& entry : dir_it) entries.push_back(entry);
+		for (const auto& entry : dir_it)
+			if (entry.path().extension() == file_ext)
+				entries.push_back(entry);
 
 		std::for_each(entries.cbegin(), entries.cend(), [&](const auto& entry)
 			{
-				if (entry.path().extension().string() == file_ext)
-				{
-					auto old_name = entry.path().filename().string();
-					auto new_name = ConstructNewFilename_(
-						entry.path().filename().string(),
-						name.has_value() ? name.value() : dir.filename().string(),
-						suffix
-					);
-					auto old_path = dir / old_name;
-					auto new_path = dir / new_name;
+				auto old_name = entry.path().filename();
+				auto new_name = ConstructNewFilename_(
+					entry.path().filename().string(),
+					name.has_value() ? name.value() : dir.filename().string(),
+					suffix,
+					file_ext
+				);
+				auto old_path = dir / old_name;
+				auto new_path = dir / new_name;
 
+				if (!std::filesystem::exists(new_path))
 					std::filesystem::rename(old_path, new_path);
-					// cb(old_name, new_name);
-					if (verbose_output_)
-						std::cout << "\t" << old_name << "\t-->\t" << new_name << std::endl;
-
-					n++;
-				}
+				if (verbose_output_)
+					std::cout << "\t" << old_name << "\t-->\t" << new_name << std::endl;
 			});
-		return n;
+
+		return entries.size();
 	}
 
 private:
 	std::string workdir_;
 	std::optional<std::string_view> subdir_;
 	bool verbose_output_{ false };
+	bool measure_exec_time_{ false };
 };
 
 #endif  // VPK_UTILS_INCLUDE_VPK_APPLICATION_H_
