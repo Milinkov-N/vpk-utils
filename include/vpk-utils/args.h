@@ -22,27 +22,32 @@ namespace args
 		constexpr FlagSpec(
 			LongName long_name,
 			ShortName short_name = {},
-			bool has_value = false
+			bool has_value = false,
+			std::string_view desc = ""
 		);
 
 	public:
 		constexpr auto long_name() const noexcept -> std::string_view;
 		constexpr auto short_name() const noexcept -> ShortName;
 		constexpr auto has_value() const noexcept -> bool;
+		constexpr auto desc() const noexcept -> std::string_view;
 
 	private:
 		LongName long_;
 		ShortName short_;
 		bool has_value_{ false };
+		std::string_view desc_;
 	};
 
 	constexpr FlagSpec::FlagSpec(
 		LongName long_name,
 		ShortName short_name,
-		bool has_value
+		bool has_value,
+		std::string_view desc
 	)	: long_(long_name)
 		, short_(short_name)
-		, has_value_(has_value) {};
+		, has_value_(has_value)
+		, desc_(desc) {};
 
 	constexpr auto FlagSpec::long_name() const noexcept -> std::string_view
 	{
@@ -57,6 +62,11 @@ namespace args
 	constexpr auto FlagSpec::has_value() const noexcept -> bool
 	{
 		return has_value_;
+	}
+
+	constexpr auto FlagSpec::desc() const noexcept -> std::string_view
+	{
+		return desc_;
 	}
 
 	class Args

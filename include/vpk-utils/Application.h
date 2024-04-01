@@ -36,7 +36,7 @@ public:
 	struct About
 	{
 		static constexpr auto NAME = "vpk-utils";
-		static constexpr auto VERSION = "0.2.1";
+		static constexpr auto VERSION = "0.2.2";
 		static constexpr auto AUTHOR = "Nikita Milinkov";
 		static constexpr auto LICENSE = "MIT Licence";
 

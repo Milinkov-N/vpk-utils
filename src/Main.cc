@@ -18,7 +18,7 @@ public:
 
 			if (spec.short_name().has_value())
 				msg_ << ", -" << spec.short_name().value();
-			msg_ << "\t" << "Default Description\n\n";
+			msg_ << "\t" << spec.desc() << "\n\n";
 		}
 	}
 
@@ -35,11 +35,11 @@ private:
 
 namespace flags
 {
-	constexpr auto WORKDIR = args::FlagSpec("workdir", "w", true);
-	constexpr auto SUBDIR = args::FlagSpec("subdir", "s", true);
-	constexpr auto VERBOSE = args::FlagSpec("verbose", "v");
-	constexpr auto EXEC_TIME = args::FlagSpec("exec-time", "t");
-	constexpr auto HELP = args::FlagSpec("help", "h");
+	constexpr auto WORKDIR = args::FlagSpec("workdir", "w", true, "Sets vpk working directory");
+	constexpr auto SUBDIR = args::FlagSpec("subdir", "s", true, "Sets subdir to list projects in");
+	constexpr auto VERBOSE = args::FlagSpec("verbose", "v", false, "Verbose output");
+	constexpr auto EXEC_TIME = args::FlagSpec("exec-time", "t", false, "Measures execution time of a program");
+	constexpr auto HELP = args::FlagSpec("help", "h", false, "Print this message and exit");
 }  // namespace flags
 
 auto main(int argc, char** argv) -> int
