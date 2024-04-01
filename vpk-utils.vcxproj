@@ -19,11 +19,13 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Main.cc" />
+    <ClCompile Include="src\Application.cc" />
+    <ClCompile Include="src\Args.cc" />
+    <ClCompile Include="src\Main.cc" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\vpk-utils\Application.h" />
-    <ClInclude Include="include\vpk-utils\args.h" />
+    <ClInclude Include="include\vpk-utils\Args.h" />
     <ClInclude Include="include\vpk-utils\utility.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

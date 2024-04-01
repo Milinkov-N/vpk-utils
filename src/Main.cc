@@ -2,7 +2,7 @@
 #include <clocale>
 #include <sstream>
 
-#include "vpk-utils/args.h"
+#include "vpk-utils/Args.h"
 #include "vpk-utils/utility.h"
 #include "vpk-utils/Application.h"
 
@@ -23,7 +23,7 @@ public:
 	}
 
 public:
-	friend auto operator<<(std::ostream& os, const Usage& usage) -> std::ostream&
+	static friend auto operator<<(std::ostream& os, const Usage& usage) -> std::ostream&
 	{
 		os << usage.msg_.str();
 		return os;
