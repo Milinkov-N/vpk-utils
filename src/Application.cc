@@ -1,5 +1,7 @@
 #include "vpk-utils/Application.h"
 
+#include <utility>
+
 auto Application::SetWorkDir(std::string_view workdir) noexcept -> void
 {
 	workdir_ = workdir;
@@ -100,7 +102,8 @@ auto Application::ConstructNewFilename_(
 ) -> std::string
 {
 	auto idx = utl::vpk::get_jpg_file_idx(old_name);
-	return new_name + "_" + idx + suffix.data() + ext.data();
+	auto padded_idx = std::string(2 - std::min((size_t)2, idx.length()), '0') + idx;
+	return new_name + "_" + padded_idx + suffix.data() + ext.data();
 }
 
 auto Application::RenameAllFilesInDir_(
