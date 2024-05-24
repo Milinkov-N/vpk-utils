@@ -28,12 +28,16 @@ public class Cli<T>
 
         var instance = new T();
         var schemaProps = _schemaType.GetProperties(BindingFlags.Instance | BindingFlags.Public);
-        var subcommandProp = schemaProps.First(prop =>
-            {
-                return prop.GetCustomAttribute<SubcommandAttribute>() is not null;
-            });
 
-        ParseSubcommand(instance, subcommandProp, args[0]);
+        if (!_options.ExcludeSubcommand)
+        {
+            var subcommandProp = schemaProps.First(prop =>
+                {
+                    return prop.GetCustomAttribute<SubcommandAttribute>() is not null;
+                });
+
+            ParseSubcommand(instance, subcommandProp, args[0]);
+        }
 
         foreach (var arg in args)
         {
@@ -48,8 +52,38 @@ public class Cli<T>
 
     public string GenerateHelp()
     {
-        var helpMessage = $"{_options.Name} v{_options.Version}  {_options.Licence} Licence";
-        return helpMessage;
+        var header = $"{_options.Name} v{_options.Version}  {_options.Licence} Licence";
+        var usage = "USAGE:\n";
+        var subcommands = "SUBCOMMANDS:\n";
+        var schemaProps = _schemaType.GetProperties(BindingFlags.Instance | BindingFlags.Public);
+        var subcommandProp = schemaProps.First(prop =>
+        {
+            return prop.GetCustomAttribute<SubcommandAttribute>() is not null;
+        });
+        var flagProps = schemaProps.Where(prop =>
+        {
+            return prop.GetCustomAttribute<FlagAttribute>() is not null;
+        });
+
+        if (!subcommandProp.PropertyType.IsEnum)
+            throw new MemberAccessException("subcommand is not of enum type");
+
+        foreach (var enumVal in Enum.GetValues(subcommandProp.PropertyType))
+        {
+            var name = enumVal.ToString()!.ToKebabCase();
+            subcommands += $"\t{name}\n";
+        }
+
+        foreach (var prop in flagProps)
+        {
+            var attr = prop.GetCustomAttribute<FlagAttribute>()!;
+            var longName = prop.Name.ToKebabCase();
+            var shortName = attr.ShortName;
+            var desc = attr.Description;
+            usage += $"\t--{longName}, -{shortName}\t {desc}\n";
+        }
+
+        return $"{header}\n{_options.Description}\n\n{subcommands}\n{usage}";
     }
 
     private static void ParseSubcommand(T inst, PropertyInfo? prop, string raw)
@@ -96,8 +130,10 @@ public class Cli<T>
     private static void ParseShortFlag(T inst, PropertyInfo[] schemaProps, string arg)
     {
         var name = arg[1..];
-        foreach (var ch in name)
+
+        for (int i = 0; i < name.Length; i++)
         {
+            char ch = name[i];
             var argProp = schemaProps.First(prop =>
             {
                 var attr = prop.GetCustomAttribute<FlagAttribute>();
@@ -107,6 +143,23 @@ public class Cli<T>
             if (argProp != null && argProp.PropertyType.Equals(typeof(bool)))
             {
                 argProp.SetValue(inst, true);
+            }
+            else if (argProp != null && argProp.PropertyType.Equals(typeof(string)))
+            {
+                if (i > 0)
+                {
+                    throw new ArgumentException("invalid flag position");
+                }
+                else if (arg.Length > 1)
+                {
+                    argProp.SetValue(inst, arg[2..]);
+                }
+                else
+                {
+                    argProp.SetValue(inst, "");
+                }
+
+                break;
             }
         }
     }
@@ -144,4 +197,5 @@ public class CliOptions
     public string Version { get; set; } = "0.1.0";
     public string Licence { get; set; } = "MIT";
     public string Description { get; set; } = string.Empty;
+    public bool ExcludeSubcommand {  get; set; } = false;
 }

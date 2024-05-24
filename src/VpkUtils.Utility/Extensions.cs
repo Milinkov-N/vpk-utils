@@ -9,10 +9,23 @@ public static class StringExtensions
         {
             if (i == 0) pascalCaseStr += str[i].ToUpperCase();
             else if (str[i].Equals('-') && i + 1 != str.Length)
-                pascalCaseStr += str[i + 1].ToUpperCase();
+                pascalCaseStr += str[++i].ToUpperCase();
             else pascalCaseStr += str[i];
         }
         return pascalCaseStr;
+    }
+
+    public static string ToKebabCase(this string str)
+    {
+        var kebabCaseStr = string.Empty;
+        for (var i = 0; i < str.Length; i++)
+        {
+            if (i == 0) kebabCaseStr += str[i].ToLowerCase();
+            else if (str[i].IsUpperCase())
+                kebabCaseStr += $"-{str[i].ToLowerCase()}";
+            else kebabCaseStr += str[i];
+        }
+        return kebabCaseStr;
     }
 }
 

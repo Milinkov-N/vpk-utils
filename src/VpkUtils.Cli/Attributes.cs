@@ -10,4 +10,3 @@ public class FlagAttribute : Attribute
 
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false)]
 public class SubcommandAttribute : Attribute;
-
