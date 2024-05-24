@@ -19,3 +19,6 @@ var config = cli.ParseArgs(args);
 var app = new Application(config!);
 
 app.Run();
+
+Console.WriteLine("Press any key to continue");
+Console.ReadKey(); 
