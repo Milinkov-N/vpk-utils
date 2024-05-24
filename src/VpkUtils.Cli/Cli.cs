@@ -7,31 +7,27 @@ namespace VpkUtils.Cli;
 public class Cli<T>
     where T : class, new()
 {
-    private readonly CliOptions _options;
-    private readonly Type _schemaType;
+    private CliOptions Options { get; }
+    private Type SchemaType { get; } = _schemaType;
+    private PropertyInfo[] SchemaProps { get; } = _schemaProps;
+    private PropertyInfo[] FlagProps { get; }
+        = _schemaProps
+            .Where(prop => prop.GetCustomAttribute<FlagAttribute>() is not null)
+            .ToArray();
 
-    public Cli()
-    {
-        _options = new CliOptions();
-        _schemaType = typeof(T);
-    }
+    public Cli() { Options = new CliOptions(); }
 
-    public Cli(CliOptions opt)
-    {
-        _options = opt;
-        _schemaType = typeof(T);
-    }
+    public Cli(CliOptions opt) { Options = opt; }
 
     public T? ParseArgs(string[] args)
     {
         if (args.Length == 0) { return null; }
 
         var instance = new T();
-        var schemaProps = _schemaType.GetProperties(BindingFlags.Instance | BindingFlags.Public);
 
-        if (!_options.ExcludeSubcommand)
+        if (!Options.ExcludeSubcommand)
         {
-            var subcommandProp = schemaProps.First(prop =>
+            var subcommandProp = SchemaProps.First(prop =>
                 {
                     return prop.GetCustomAttribute<SubcommandAttribute>() is not null;
                 });
@@ -42,9 +38,9 @@ public class Cli<T>
         foreach (var arg in args)
         {
             if (arg.StartsWith("--"))
-                ParseLongFlag(instance, schemaProps, arg);
+                ParseLongFlag(instance, arg);
             else if (arg.StartsWith('-'))
-                ParseShortFlag(instance, schemaProps, arg);
+                ParseShortFlag(instance, arg);
         }
 
         return instance;
@@ -52,17 +48,13 @@ public class Cli<T>
 
     public string GenerateHelp()
     {
-        var header = $"{_options.Name} v{_options.Version}  {_options.Licence} Licence";
+        var header = $"{Options.Name} v{Options.Version}  {Options.Licence} Licence";
         var usage = "USAGE:\n";
         var subcommands = "SUBCOMMANDS:\n";
-        var schemaProps = _schemaType.GetProperties(BindingFlags.Instance | BindingFlags.Public);
+        var schemaProps = SchemaType.GetProperties(BindingFlags.Instance | BindingFlags.Public);
         var subcommandProp = schemaProps.First(prop =>
         {
             return prop.GetCustomAttribute<SubcommandAttribute>() is not null;
-        });
-        var flagProps = schemaProps.Where(prop =>
-        {
-            return prop.GetCustomAttribute<FlagAttribute>() is not null;
         });
 
         if (!subcommandProp.PropertyType.IsEnum)
@@ -74,7 +66,7 @@ public class Cli<T>
             subcommands += $"\t{name}\n";
         }
 
-        foreach (var prop in flagProps)
+        foreach (var prop in FlagProps)
         {
             var attr = prop.GetCustomAttribute<FlagAttribute>()!;
             var longName = prop.Name.ToKebabCase();
@@ -83,7 +75,7 @@ public class Cli<T>
             usage += $"\t--{longName}, -{shortName}\t {desc}\n";
         }
 
-        return $"{header}\n{_options.Description}\n\n{subcommands}\n{usage}";
+        return $"{header}\n{Options.Description}\n\n{subcommands}\n{usage}";
     }
 
     private static void ParseSubcommand(T inst, PropertyInfo? prop, string raw)
@@ -108,10 +100,10 @@ public class Cli<T>
         }
     }
 
-    private static void ParseLongFlag(T inst, PropertyInfo[] schemaProps, string arg)
+    private void ParseLongFlag(T inst, string arg)
     {
         var (name, value) = ArgKeyValue(arg);
-        var argProp = schemaProps.First(prop => prop.Name.Equals(name));
+        var argProp = FlagProps.First(prop => prop.Name.Equals(name));
 
         if (argProp != null && argProp.PropertyType.Equals(typeof(bool)))
         {
@@ -123,18 +115,18 @@ public class Cli<T>
         }
         else
         {
-            throw new ArgumentException("unsupported cli agrument type");
+            throw new ArgumentException($"unknown '{name}' flag");
         }
     }
 
-    private static void ParseShortFlag(T inst, PropertyInfo[] schemaProps, string arg)
+    private void ParseShortFlag(T inst, string arg)
     {
         var name = arg[1..];
 
         for (int i = 0; i < name.Length; i++)
         {
             char ch = name[i];
-            var argProp = schemaProps.First(prop =>
+            var argProp = FlagProps.First(prop =>
             {
                 var attr = prop.GetCustomAttribute<FlagAttribute>();
                 return ValidateShortFlagAttr(attr, prop, ch);
@@ -189,6 +181,10 @@ public class Cli<T>
 
         return prop.Name.First().ToLowerCase().Equals(ch);
     }
+
+    private static readonly Type _schemaType = typeof(T);
+    private static readonly PropertyInfo[] _schemaProps
+        = _schemaType.GetProperties(BindingFlags.Instance | BindingFlags.Public);
 }
 
 public class CliOptions
