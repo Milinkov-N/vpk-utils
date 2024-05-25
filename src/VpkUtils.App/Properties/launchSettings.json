@@ -2,7 +2,11 @@
   "profiles": {
     "VpkUtils.App": {
       "commandName": "Project",
-      "commandLineArgs": ""
+      "commandLineArgs": "rename -dvt -sмай"
+    },
+    "VpkUtils.App.CheckSize": {
+      "commandName": "Project",
+      "commandLineArgs": "check-size -sмай"
     }
   }
 }

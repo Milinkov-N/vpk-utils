@@ -23,6 +23,9 @@ internal class Config
 
     [Flag(ShortName = "h", Description = "prints this message")]
     public bool Help { get; set; } = false;
+
+    public int BpFileSizeLimit { get; set; } = 200;
+    public int DmFileSizeLimit { get; set; } = 200;
 }
 
 internal enum Subcommand

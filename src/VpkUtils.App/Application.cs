@@ -1,4 +1,5 @@
-﻿using VpkUtils.Utility;
+﻿using System.IO;
+using System.Security;
 using Timer = VpkUtils.Utility.Timer;
 
 namespace VpkUtils.App;
@@ -12,6 +13,7 @@ internal class Application(Config cfg)
         switch (cfg.Subcommand)
         {
             case Subcommand.Rename: ExecRename(); break;
+            case Subcommand.CheckSize: ExecCheckSize(); break;
             default: throw new NotImplementedException();
         };
 
@@ -39,6 +41,40 @@ internal class Application(Config cfg)
             if (cfg.Verbose)
                 Console.WriteLine($"Renaming {ext} files in /{path}:");
             r.Run(cfg.DryRun);
+        }
+    }
+
+    private void ExecCheckSize()
+    {
+        var dir = cfg.WorkDir is not null ? GetFullPath() : SelectDir();
+        var invalidBpFiles = CheckFileSizesInDir(Path.Combine(dir, "BP"), cfg.BpFileSizeLimit);
+        var invalidDmFiles = CheckFileSizesInDir(Path.Combine(dir, "DM"), cfg.DmFileSizeLimit);
+        FileSizeCheckPrintResult("BP", invalidBpFiles);
+        FileSizeCheckPrintResult("DM", invalidDmFiles);
+    }
+
+    private static List<string> CheckFileSizesInDir(string dir, int fileSizeLimit)
+    {
+        var invalidFiles = new List<string>();
+        var files = Directory.EnumerateFiles(dir)
+            .Where(d => Path.GetExtension(d) == ".jpg");
+        foreach (var file in files)
+            if (new FileInfo(file).Length / 1024 >= fileSizeLimit)
+                invalidFiles.Add(file);
+        return invalidFiles;
+    }
+
+    private static void FileSizeCheckPrintResult(string checkedDir, List<string> invalidFiles)
+    {
+        if (invalidFiles.Count > 0)
+        {
+            Console.WriteLine($"There {invalidFiles.Count} files in /{checkedDir} with invalid size:");
+            foreach (var file in invalidFiles)
+                Console.WriteLine($"\t{Path.GetFileName(file)} \x1b[31m{new FileInfo(file).Length / 1024}KB\u001b[0m");
+        }
+        else
+        {
+            Console.WriteLine($"\x1b[32m[+]\u001b[0m All Files in /{checkedDir} of valid size.");
         }
     }
 
