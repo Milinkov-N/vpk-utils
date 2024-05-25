@@ -2,7 +2,7 @@
   "profiles": {
     "VpkUtils.App": {
       "commandName": "Project",
-      "commandLineArgs": "rename -sмай -dvt"
+      "commandLineArgs": ""
     }
   }
 }

@@ -1,54 +1,49 @@
-using VpkUtils.Cli;
+using VpkUtils.Clap;
 
 namespace VpkUtils.Tests;
 
 public class CliUnitTest
 {
     [Fact]
-    public void Cli_ParseArgsWithFirstSubcommand_ReturnsValidInstance()
+    public void Cli_ParseSubcommandWithFirstValue_ReturnsValidInstance()
     {
-        var cli = new Cli<CorrectMockSchema>();
         var args = new[] { "first" };
+        var cli = new Clap<CorrectMockSchema>(args);
 
-        var schema = cli.ParseArgs(args);
+        var schema = cli.Parse();
 
-        Assert.NotNull(schema);
         Assert.StrictEqual(Subcommand.First, schema.Subcommand);
     }
 
     [Fact]
-    public void Cli_ParseArgsWithThirdSubcommand_ReturnsValidInstance()
+    public void Cli_ParseSubcommandWithThirdValue_ReturnsValidInstance()
     {
-        var cli = new Cli<CorrectMockSchema>();
         var args = new[] { "third" };
+        var cli = new Clap<CorrectMockSchema>(args);
 
-        var schema = cli.ParseArgs(args);
+        var schema = cli.Parse();
 
-        Assert.NotNull(schema);
         Assert.StrictEqual(Subcommand.Third, schema.Subcommand);
     }
 
     [Fact]
-    public void Cli_ParseArgsWithInvalidSubcommand_ThrowsException()
+    public void Cli_ParseInvalidSubcommand_ThrowsException()
     {
-        var cli = new Cli<CorrectMockSchema>();
         var args = new[] { "invalid" };
+        var cli = new Clap<CorrectMockSchema>(args);
 
-        var action = () => cli.ParseArgs(args);
+        var schema = cli.Parse();
 
-        Assert.Throws<ArgumentException>(action);
+        Assert.StrictEqual(Subcommand.Unset, schema.Subcommand);
     }
 
     [Fact]
     public void Cli_ParseLongFlagsOfBooleanType_ReturnsValidInstance()
     {
-        var cli = new Cli<CorrectMockSchema>(new CliOptions
-        {
-            ExcludeSubcommand = true,
-        });
         var args = new[] { "--verbose", "--dry-run", "--explain" };
+        var cli = new Clap<CorrectMockSchema>(args);
 
-        var schema = cli.ParseArgs(args);
+        var schema = cli.Parse();
 
         Assert.NotNull(schema);
         Assert.True(schema.Verbose);
@@ -59,13 +54,10 @@ public class CliUnitTest
     [Fact]
     public void Cli_ParseLongFlagsWithValues_ReturnsValidInstance()
     {
-        var cli = new Cli<CorrectMockSchema>(new CliOptions
-        {
-            ExcludeSubcommand = true,
-        });
         var args = new[] { "--work-dir=/foo/bar", "--sub-dir=q/s/d" };
+        var cli = new Clap<CorrectMockSchema>(args);
 
-        var schema = cli.ParseArgs(args);
+        var schema = cli.Parse();
 
         Assert.NotNull(schema);
         Assert.Equal("/foo/bar", schema.WorkDir);
@@ -75,13 +67,10 @@ public class CliUnitTest
     [Fact]
     public void Cli_ParseShortFlagsOfBooleanType_ReturnsValidInstance()
     {
-        var cli = new Cli<CorrectMockSchema>(new CliOptions
-        {
-            ExcludeSubcommand = true,
-        });
         var args = new[] { "-v", "-d", "-e" };
+        var cli = new Clap<CorrectMockSchema>(args);
 
-        var schema = cli.ParseArgs(args);
+        var schema = cli.Parse();
 
         Assert.NotNull(schema);
         Assert.True(schema.Verbose);
@@ -92,13 +81,10 @@ public class CliUnitTest
     [Fact]
     public void Cli_ParseShortFlagsWithValues_ReturnsValidInstance()
     {
-        var cli = new Cli<CorrectMockSchema>(new CliOptions
-        {
-            ExcludeSubcommand = true,
-        });
         var args = new[] { "-w/foo/bar", "-sq/s/d" };
+        var cli = new Clap<CorrectMockSchema>(args);
 
-        var schema = cli.ParseArgs(args);
+        var schema = cli.Parse();
 
         Assert.NotNull(schema);
         Assert.Equal("/foo/bar", schema.WorkDir);
@@ -108,13 +94,10 @@ public class CliUnitTest
     [Fact]
     public void Cli_ParseShortFlagsOfBooleanTypeInBatch_ReturnsValidInstance()
     {
-        var cli = new Cli<CorrectMockSchema>(new CliOptions
-        {
-            ExcludeSubcommand = true,
-        });
         var args = new[] { "-vde" };
+        var cli = new Clap<CorrectMockSchema>(args);
 
-        var schema = cli.ParseArgs(args);
+        var schema = cli.Parse();
 
         Assert.NotNull(schema);
         Assert.True(schema.Verbose);
@@ -125,13 +108,10 @@ public class CliUnitTest
     [Fact]
     public void Cli_ParseShortFlagsAndLongFlagsInBatch_ThrowsException()
     {
-        var cli = new Cli<CorrectMockSchema>(new CliOptions
-        {
-            ExcludeSubcommand = true,
-        });
         var args = new[] { "-vw/foo/bar" };
+        var cli = new Clap<CorrectMockSchema>(args);
 
-        var action = () => cli.ParseArgs(args);
+        var action = () => cli.Parse();
 
         Assert.Throws<ArgumentException>(action);
     }
@@ -161,6 +141,7 @@ internal class CorrectMockSchema
 
 internal enum Subcommand
 {
+    Unset,
     First,
     Second,
     Third

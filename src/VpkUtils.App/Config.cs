@@ -1,4 +1,4 @@
-﻿using VpkUtils.Cli;
+﻿using VpkUtils.Clap;
 
 namespace VpkUtils.App;
 
@@ -7,7 +7,7 @@ internal class Config
     [Subcommand]
     public Subcommand Subcommand { get; set; }
 
-    [Flag(ShortName = "w", Description = "sets root directory where all projects are located")]
+    [Flag(ShortName = "w", Description = "sets working directory where files be renamed. --sub-dir flag is ignored")]
     public string? WorkDir { get; set; }
 
     [Flag(ShortName = "s", Description = "sets subdirectory for listing available projects")]
@@ -20,10 +20,14 @@ internal class Config
 
     [Flag(ShortName = "d", Description = "test program without actually renaming files")]
     public bool DryRun { get; set; } = false;
+
+    [Flag(ShortName = "h", Description = "prints this message")]
+    public bool Help { get; set; } = false;
 }
 
 internal enum Subcommand
 {
+    Unset,
     Rename,
     CheckSize,
 }

@@ -1,7 +1,7 @@
-﻿using VpkUtils.Cli;
+﻿using VpkUtils.Clap;
 using VpkUtils.App;
 
-var cli = new Cli<Config>(new CliOptions
+var cli = new Clap<Config>(args, new ClapOptions
 {
     Name = "vpk-utils",
     Version = "1.0.0",
@@ -9,15 +9,15 @@ var cli = new Cli<Config>(new CliOptions
     Description = $"Developed by Nikita Milinkov ({DateTime.Now.Year})"
 });
 
-if (args.Length == 0)
+var config = cli.Parse();
+
+if (args.Length == 0 || config.Help)
 {
     Console.WriteLine(cli.GenerateHelp());
     return;
 }
 
-var config = cli.ParseArgs(args);
-var app = new Application(config!);
-
+var app = new Application(config);
 app.Run();
 
 Console.WriteLine("Press any key to continue");

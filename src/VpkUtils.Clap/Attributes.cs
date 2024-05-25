@@ -1,4 +1,4 @@
-﻿namespace VpkUtils.Cli;
+﻿namespace VpkUtils.Clap;
 
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false)]
 public class FlagAttribute : Attribute

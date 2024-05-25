@@ -2,40 +2,36 @@
 
 using VpkUtils.Utility;
 
-namespace VpkUtils.Cli;
+namespace VpkUtils.Clap;
 
-public class Cli<T>
+public class Clap<T>
     where T : class, new()
 {
-    private CliOptions Options { get; }
-    private Type SchemaType { get; } = _schemaType;
-    private PropertyInfo[] SchemaProps { get; } = _schemaProps;
-    private PropertyInfo[] FlagProps { get; }
-        = _schemaProps
-            .Where(prop => prop.GetCustomAttribute<FlagAttribute>() is not null)
-            .ToArray();
+    private string[] Args { get; }
+    private ClapOptions Options { get; }
+    private static SchemaMetadata<T> Meta { get; }
 
-    public Cli() { Options = new CliOptions(); }
-
-    public Cli(CliOptions opt) { Options = opt; }
-
-    public T? ParseArgs(string[] args)
+    public Clap(string[] args)
     {
-        if (args.Length == 0) { return null; }
+        Args = args;
+        Options = new ClapOptions();
+    }
 
+    public Clap(string[] args, ClapOptions opt)
+    {
+        Args = args;
+        Options = opt;
+    }
+
+    public T Parse()
+    {
         var instance = new T();
 
-        if (!Options.ExcludeSubcommand)
-        {
-            var subcommandProp = SchemaProps.First(prop =>
-                {
-                    return prop.GetCustomAttribute<SubcommandAttribute>() is not null;
-                });
+        if (Args.Length == 0) { return instance; }
 
-            ParseSubcommand(instance, subcommandProp, args[0]);
-        }
+        ParseSubcommand(instance);
 
-        foreach (var arg in args)
+        foreach (var arg in Args)
         {
             if (arg.StartsWith("--"))
                 ParseLongFlag(instance, arg);
@@ -46,13 +42,39 @@ public class Cli<T>
         return instance;
     }
 
+    private void ParseSubcommand(T inst)
+    {
+        var subcommandProp = Meta.Props
+            .First(prop => prop.GetCustomAttribute<SubcommandAttribute>() is not null);
+
+        if (subcommandProp == null) { return; }
+
+        if (!subcommandProp.PropertyType.IsEnum)
+            throw new Exception("subcommand is not of enum type");
+
+        foreach (var arg in Args.Where(arg => !arg.StartsWith("--") && !arg.StartsWith('-')))
+        {
+            foreach (var enumVal in Enum.GetValues(subcommandProp.PropertyType))
+            {
+                if (enumVal.ToString()!.ToKebabCase().Equals(arg))
+                {
+                    subcommandProp.SetValue(
+                        inst,
+                        Enum.Parse(subcommandProp.PropertyType, enumVal.ToString()!),
+                        null
+                    );
+                    break;
+                }
+            }
+        }
+    }
+
     public string GenerateHelp()
     {
         var header = $"{Options.Name} v{Options.Version}  {Options.Licence} Licence";
         var usage = "USAGE:\n";
         var subcommands = "SUBCOMMANDS:\n";
-        var schemaProps = SchemaType.GetProperties(BindingFlags.Instance | BindingFlags.Public);
-        var subcommandProp = schemaProps.First(prop =>
+        var subcommandProp = Meta.Props.First(prop =>
         {
             return prop.GetCustomAttribute<SubcommandAttribute>() is not null;
         });
@@ -63,10 +85,10 @@ public class Cli<T>
         foreach (var enumVal in Enum.GetValues(subcommandProp.PropertyType))
         {
             var name = enumVal.ToString()!.ToKebabCase();
-            subcommands += $"\t{name}\n";
+            if (name != "unset") subcommands += $"\t{name}\n";
         }
 
-        foreach (var prop in FlagProps)
+        foreach (var prop in Meta.FlagProps)
         {
             var attr = prop.GetCustomAttribute<FlagAttribute>()!;
             var longName = prop.Name.ToKebabCase();
@@ -78,32 +100,10 @@ public class Cli<T>
         return $"{header}\n{Options.Description}\n\n{subcommands}\n{usage}";
     }
 
-    private static void ParseSubcommand(T inst, PropertyInfo? prop, string raw)
-    {
-        if (prop != null)
-        {
-            if (!prop.PropertyType.IsEnum)
-                throw new MemberAccessException("subcommand is not of enum type");
-
-            var valueSet = false;
-
-            foreach (var enumVal in Enum.GetValues(prop.PropertyType))
-            {
-                if (enumVal.ToString()!.ToLower().Equals(raw))
-                {
-                    prop.SetValue(inst, enumVal);
-                    valueSet = true;
-                }
-            }
-
-            if (!valueSet) throw new ArgumentException("subcommand at index 0 is invalid");
-        }
-    }
-
-    private void ParseLongFlag(T inst, string arg)
+    private static void ParseLongFlag(T inst, string arg)
     {
         var (name, value) = ArgKeyValue(arg);
-        var argProp = FlagProps.First(prop => prop.Name.Equals(name));
+        var argProp = Meta.FlagProps.First(prop => prop.Name.Equals(name));
 
         if (argProp != null && argProp.PropertyType.Equals(typeof(bool)))
         {
@@ -119,14 +119,14 @@ public class Cli<T>
         }
     }
 
-    private void ParseShortFlag(T inst, string arg)
+    private static void ParseShortFlag(T inst, string arg)
     {
         var name = arg[1..];
 
         for (int i = 0; i < name.Length; i++)
         {
             char ch = name[i];
-            var argProp = FlagProps.First(prop =>
+            var argProp = Meta.FlagProps.First(prop =>
             {
                 var attr = prop.GetCustomAttribute<FlagAttribute>();
                 return ValidateShortFlagAttr(attr, prop, ch);
@@ -181,17 +181,13 @@ public class Cli<T>
 
         return prop.Name.First().ToLowerCase().Equals(ch);
     }
-
-    private static readonly Type _schemaType = typeof(T);
-    private static readonly PropertyInfo[] _schemaProps
-        = _schemaType.GetProperties(BindingFlags.Instance | BindingFlags.Public);
 }
 
-public class CliOptions
+public class ClapOptions
 {
     public string Name { get; set; } = string.Empty;
     public string Version { get; set; } = "0.1.0";
     public string Licence { get; set; } = "MIT";
     public string Description { get; set; } = string.Empty;
-    public bool ExcludeSubcommand {  get; set; } = false;
 }
+

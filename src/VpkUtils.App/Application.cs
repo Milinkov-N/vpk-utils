@@ -1,36 +1,32 @@
-﻿namespace VpkUtils.App;
+﻿using VpkUtils.Utility;
+using Timer = VpkUtils.Utility.Timer;
+
+namespace VpkUtils.App;
 
 internal class Application(Config cfg)
 {
-    private readonly Config _config = cfg;
-    private readonly string _fullPath = Path.Combine(
-        cfg.WorkDir
-            ?? (Environment.GetEnvironmentVariable("VPK_DIR")
-                ?? Directory.GetCurrentDirectory()),
-        cfg.SubDir ?? ""
-    );
+    private Timer Timer { get; } = new Timer();
 
     public void Run()
     {
-        var startTime = DateTime.Now;
-
-        switch (_config.Subcommand)
+        switch (cfg.Subcommand)
         {
             case Subcommand.Rename: ExecRename(); break;
             default: throw new NotImplementedException();
         };
 
-        var elapsed = DateTime.Now - startTime;
-        if (_config.TimeExec)
-            Console.WriteLine($"Finished in: {elapsed.Milliseconds}ms");
+        Timer.End();
+        if (cfg.TimeExec)
+            Console.WriteLine($"Finished in: {Timer.ElapsedMillis()}ms");
     }
 
     private void ExecRename()
     {
-        var dir = _config.WorkDir is not null ? _fullPath : SelectDir();
+        var dir = cfg.WorkDir is not null ? GetFullPath() : SelectDir();
         var newName = Path.GetFileName(dir);
         var renamers = GetFileRenamers(dir);
 
+        Timer.Start();
         foreach (var r in renamers)
         {
             var opt = r.GetOptions();
@@ -40,9 +36,9 @@ internal class Application(Config cfg)
             var path = Path.GetFileName(opt.Path) == newName
                 ? ""
                 : Path.GetFileName(opt.Path);
-            if (_config.Verbose)
+            if (cfg.Verbose)
                 Console.WriteLine($"Renaming {ext} files in /{path}:");
-            r.Run(_config.DryRun);
+            r.Run(cfg.DryRun);
         }
     }
 
@@ -76,7 +72,7 @@ internal class Application(Config cfg)
 
     private void Log(string entry, string newName)
     {
-        if (_config.Verbose)
+        if (cfg.Verbose)
             Console.WriteLine($"\t{Path.GetFileName(entry)}\t-->\t{newName}");
     }
 
@@ -95,12 +91,19 @@ internal class Application(Config cfg)
 
     private List<string> ListAvailableDirectories()
     {
-        var dirs = Directory.EnumerateDirectories(_fullPath);
+        var dirs = Directory.EnumerateDirectories(GetFullPath());
         var n = dirs.Count();
         for (int i = 0; i < n; i++)
         {
             Console.WriteLine($"\t[{i}] {Path.GetFileName(dirs.ElementAt(i))}");
         }
         return dirs.ToList();
+    }
+
+    private string GetFullPath()
+    {
+        var vpkDir = Environment.GetEnvironmentVariable("VPK_DIR") ?? Directory.GetCurrentDirectory();
+        var subDir = cfg.SubDir ?? "";
+        return Path.Combine(vpkDir, subDir);
     }
 }
