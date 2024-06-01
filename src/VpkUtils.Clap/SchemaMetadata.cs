@@ -2,10 +2,10 @@
 
 namespace VpkUtils.Clap;
 
-internal struct SchemaMetadata<T>
+internal readonly struct SchemaMetadata(Type ty)
 {
 
-    public readonly Type Type { get { return typeof(T); } }
+    public readonly Type Type { get; init; } = ty;
 
     public readonly PropertyInfo[] Props
     {

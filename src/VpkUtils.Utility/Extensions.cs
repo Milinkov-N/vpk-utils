@@ -27,6 +27,14 @@ public static class StringExtensions
         }
         return kebabCaseStr;
     }
+
+    public static string TrimEnd(this string str, string end)
+    {
+        var trimmed = str;
+        var endIdx = str.IndexOf(end);
+        if (endIdx > 0) trimmed = trimmed[..endIdx];
+        return trimmed;
+    }
 }
 
 public static class CharExtensions

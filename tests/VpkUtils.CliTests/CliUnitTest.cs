@@ -4,145 +4,154 @@ namespace VpkUtils.Tests;
 
 public class CliUnitTest
 {
-    [Fact]
-    public void Cli_ParseSubcommandWithFirstValue_ReturnsValidInstance()
+    private static Clap<RootOptions> NewClap(List<string> args)
     {
-        var args = new[] { "first" };
-        var cli = new Clap<CorrectMockSchema>(args);
-
-        var schema = cli.Parse();
-
-        Assert.StrictEqual(Subcommand.First, schema.Subcommand);
+        return new Clap<RootOptions>(args)
+        {
+            Subcommands = [
+                typeof(FirstOptions),
+                typeof(SecondOptions),
+            ]
+        };
     }
 
     [Fact]
-    public void Cli_ParseSubcommandWithThirdValue_ReturnsValidInstance()
+    public void Cli_ParseRootOptionsWithoutFlags_ReturnsValidInstance()
     {
-        var args = new[] { "third" };
-        var cli = new Clap<CorrectMockSchema>(args);
+        var cli = NewClap([]);
 
-        var schema = cli.Parse();
-
-        Assert.StrictEqual(Subcommand.Third, schema.Subcommand);
-    }
-
-    [Fact]
-    public void Cli_ParseInvalidSubcommand_ThrowsException()
-    {
-        var args = new[] { "invalid" };
-        var cli = new Clap<CorrectMockSchema>(args);
-
-        var schema = cli.Parse();
-
-        Assert.StrictEqual(Subcommand.Unset, schema.Subcommand);
-    }
-
-    [Fact]
-    public void Cli_ParseLongFlagsOfBooleanType_ReturnsValidInstance()
-    {
-        var args = new[] { "--verbose", "--dry-run", "--explain" };
-        var cli = new Clap<CorrectMockSchema>(args);
-
-        var schema = cli.Parse();
+        var (schema, _) = cli.Parse();
 
         Assert.NotNull(schema);
-        Assert.True(schema.Verbose);
-        Assert.True(schema.DryRun);
-        Assert.True(schema.Explain);
+        Assert.False(schema.Help);
     }
 
     [Fact]
-    public void Cli_ParseLongFlagsWithValues_ReturnsValidInstance()
+    public void Cli_ParseRootOptionsWithOneFlag_ReturnsValidInstance()
     {
-        var args = new[] { "--work-dir=/foo/bar", "--sub-dir=q/s/d" };
-        var cli = new Clap<CorrectMockSchema>(args);
+        var cli = NewClap(["--help"]);
 
-        var schema = cli.Parse();
+        var (schema, _) = cli.Parse();
 
         Assert.NotNull(schema);
-        Assert.Equal("/foo/bar", schema.WorkDir);
-        Assert.Equal("q/s/d", schema.SubDir);
+        Assert.True(schema.Help);
     }
 
     [Fact]
-    public void Cli_ParseShortFlagsOfBooleanType_ReturnsValidInstance()
+    public void Cli_ParseRootOptions_ReturnsValidInstance()
     {
-        var args = new[] { "-v", "-d", "-e" };
-        var cli = new Clap<CorrectMockSchema>(args);
+        var cli = NewClap(["--help", "-Ldebug"]);
 
-        var schema = cli.Parse();
+        var (schema, _) = cli.Parse();
 
         Assert.NotNull(schema);
-        Assert.True(schema.Verbose);
-        Assert.True(schema.DryRun);
-        Assert.True(schema.Explain);
+        Assert.True(schema.Help);
+        Assert.Equal("debug", schema.LogLevel);
     }
 
     [Fact]
-    public void Cli_ParseShortFlagsWithValues_ReturnsValidInstance()
+    public void Cli_ParseRootOptionsInvalidFlag_ReturnsValidInstance()
     {
-        var args = new[] { "-w/foo/bar", "-sq/s/d" };
-        var cli = new Clap<CorrectMockSchema>(args);
+        var cli = NewClap(["--invalid"]);
 
-        var schema = cli.Parse();
+        Assert.Throws<UnexpectedArgumentException>(() => cli.Parse());
+    }
+
+    [Fact]
+    public void Cli_ParseFirstSubcommandWithNoFlags_ReturnsValidInstance()
+    {
+        var cli = NewClap(["first"]);
+
+        var (_, subcommand) = cli.Parse();
+
+        Assert.NotNull(subcommand);
+        Assert.IsType<FirstOptions>(subcommand);
+    }
+
+    [Fact]
+    public void Cli_ParseFirstSubcommandWithLongFlags_ReturnsValidInstance()
+    {
+        var cli = NewClap(["first", "--work-dir=foo", "--sub-dir=bar"]);
+
+        var (_, subcommand) = cli.Parse();
+
+        Assert.NotNull(subcommand);
+        Assert.IsType<FirstOptions>(subcommand);
+
+        FirstOptions firstOptions = (FirstOptions)subcommand;
+        Assert.Equal("foo", firstOptions.WorkDir);
+        Assert.Equal("bar", firstOptions.SubDir);
+    }
+
+    [Fact]
+    public void Cli_ParseFirstSubcommandWithShortFlags_ReturnsValidInstance()
+    {
+        var cli = NewClap(["first", "-wfoo", "-sbar"]);
+
+        var (_, subcommand) = cli.Parse();
+
+        Assert.NotNull(subcommand);
+        Assert.IsType<FirstOptions>(subcommand);
+
+        FirstOptions firstOptions = (FirstOptions)subcommand;
+        Assert.Equal("foo", firstOptions.WorkDir);
+        Assert.Equal("bar", firstOptions.SubDir);
+    }
+
+
+    [Fact]
+    public void Cli_ParseFirstSubcommandWithInvalidFlag_ReturnsValidInstance()
+    {
+        var cli = NewClap(["first", "--invalid"]);
+
+        Assert.Throws<UnexpectedArgumentException>(() => cli.Parse());
+    }
+
+    [Fact]
+    public void Cli_ParseFirstSubcommandWithShortFlagsAndRootOptions_ReturnsValidInstance()
+    {
+        var cli = NewClap(["--help", "first", "-wfoo", "-sbar"]);
+
+        var (schema, subcommand) = cli.Parse();
 
         Assert.NotNull(schema);
-        Assert.Equal("/foo/bar", schema.WorkDir);
-        Assert.Equal("q/s/d", schema.SubDir);
-    }
+        Assert.True(schema.Help);
 
-    [Fact]
-    public void Cli_ParseShortFlagsOfBooleanTypeInBatch_ReturnsValidInstance()
-    {
-        var args = new[] { "-vde" };
-        var cli = new Clap<CorrectMockSchema>(args);
+        Assert.NotNull(subcommand);
+        Assert.IsType<FirstOptions>(subcommand);
 
-        var schema = cli.Parse();
-
-        Assert.NotNull(schema);
-        Assert.True(schema.Verbose);
-        Assert.True(schema.DryRun);
-        Assert.True(schema.Explain);
-    }
-
-    [Fact]
-    public void Cli_ParseShortFlagsAndLongFlagsInBatch_ThrowsException()
-    {
-        var args = new[] { "-vw/foo/bar" };
-        var cli = new Clap<CorrectMockSchema>(args);
-
-        var action = () => cli.Parse();
-
-        Assert.Throws<ArgumentException>(action);
+        FirstOptions firstOptions = (FirstOptions)subcommand;
+        Assert.Equal("foo", firstOptions.WorkDir);
+        Assert.Equal("bar", firstOptions.SubDir);
     }
 }
 
-internal class CorrectMockSchema
+internal class RootOptions
 {
-    [Subcommand]
-    public Subcommand Subcommand { get; set; }
+    [Flag('h')]
+    public bool Help { get; set; }
 
+    [Flag('L')]
+    public string LogLevel { get; set; } = string.Empty;
+}
 
-    [Flag(ShortName = "v")]
-    public bool Verbose { get; set; }
-
-    [Flag(ShortName = "d")]
-    public bool DryRun { get; set; }
-
-    [Flag(ShortName = "e")]
-    public bool Explain { get; set; }
-
-    [Flag(ShortName = "w")]
+[Subcommand]
+internal class FirstOptions
+{
+    [Flag('w')]
     public string WorkDir { get; set; } = string.Empty;
 
-    [Flag(ShortName = "s")]
+    [Flag('s')]
     public string SubDir { get; set; } = string.Empty;
 }
 
-internal enum Subcommand
+
+[Subcommand]
+internal class SecondOptions
 {
-    Unset,
-    First,
-    Second,
-    Third
+    [Flag('d')]
+    public bool DryRun { get; set; }
+
+    [Flag('e')]
+    public bool Explain { get; set; }
 }

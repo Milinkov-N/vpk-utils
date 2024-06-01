@@ -7,179 +7,112 @@ namespace VpkUtils.Clap;
 public class Clap<T>
     where T : class, new()
 {
-    private string[] Args { get; }
-    private ClapOptions Options { get; }
-    private static SchemaMetadata<T> Meta { get; }
+    private List<string> Args { get; }
 
-    public Clap(string[] args)
+    public List<Type> Subcommands { get; init; } = [];
+    private ClapOptions Options { get; }
+
+    public Clap(List<string> args)
     {
         Args = args;
         Options = new ClapOptions();
     }
 
-    public Clap(string[] args, ClapOptions opt)
+    public Clap(List<string> args, ClapOptions opt)
     {
         Args = args;
         Options = opt;
     }
 
-    public T Parse()
+    public void AddSubcommand<S>()
+        where S : class, new()
     {
-        var instance = new T();
-
-        if (Args.Length == 0) { return instance; }
-
-        ParseSubcommand(instance);
-
-        foreach (var arg in Args)
-        {
-            if (arg.StartsWith("--"))
-                ParseLongFlag(instance, arg);
-            else if (arg.StartsWith('-'))
-                ParseShortFlag(instance, arg);
-        }
-
-        return instance;
+        if (Subcommands.Contains(typeof(S)))
+            throw new ArgumentException($"subcommand `{typeof(S).Name}` is already listed");
+        Subcommands.Add(typeof(S));
     }
 
-    private void ParseSubcommand(T inst)
+    public (T, object?) Parse()
     {
-        var subcommandProp = Meta.Props
-            .First(prop => prop.GetCustomAttribute<SubcommandAttribute>() is not null);
+        var instance = new T();
+        var parser = new FlagParser(instance, typeof(T));
+        object? subCmd = null;
 
-        if (subcommandProp == null) { return; }
+        if (Args.Count == 0) { return (instance, subCmd); }
 
-        if (!subcommandProp.PropertyType.IsEnum)
-            throw new Exception("subcommand is not of enum type");
+        var (idx, type) = FindSubcommand();
 
-        foreach (var arg in Args.Where(arg => !arg.StartsWith("--") && !arg.StartsWith('-')))
+        if (idx == -1)
         {
-            foreach (var enumVal in Enum.GetValues(subcommandProp.PropertyType))
-            {
-                if (enumVal.ToString()!.ToKebabCase().Equals(arg))
-                {
-                    subcommandProp.SetValue(
-                        inst,
-                        Enum.Parse(subcommandProp.PropertyType, enumVal.ToString()!),
-                        null
-                    );
-                    break;
-                }
-            }
+            parser.ParseArgs(Args);
         }
+        else
+        {
+            parser.ParseArgs(Args[..idx]);
+            subCmd = ParseSubcommand(idx, type);
+        }
+
+        return (instance, subCmd);
+    }
+
+    private object? ParseSubcommand(int idx, Type? type)
+    {
+        if (type != null)
+        {
+            var inst = Activator.CreateInstance(type);
+            var parser = new FlagParser(inst!, type);
+
+            parser.ParseArgs(Args[(idx + 1)..]);
+
+            return inst;
+        }
+
+        return null;
+    }
+
+    private (int, Type?) FindSubcommand()
+    {
+        foreach (var arg in Args
+            .Where(arg => !arg.StartsWith("--") && !arg.StartsWith('-')))
+        {
+            var ty = GetSubcommand(arg);
+            if (ty != null) return (Args.IndexOf(arg), ty);
+        }
+
+        return (-1, null);
+    }
+
+    private Type? GetSubcommand(string name)
+    {
+        return Subcommands.First(cmd => name.Equals(
+                cmd.Name.TrimEnd("Subcommand").TrimEnd("Options"),
+                StringComparison.CurrentCultureIgnoreCase));
     }
 
     public string GenerateHelp()
     {
+        var meta = new SchemaMetadata(typeof(T));
         var header = $"{Options.Name} v{Options.Version}  {Options.Licence} Licence";
-        var usage = "USAGE:\n";
+        var options = "OPTIONS:\n";
         var subcommands = "SUBCOMMANDS:\n";
-        var subcommandProp = Meta.Props.First(prop =>
-        {
-            return prop.GetCustomAttribute<SubcommandAttribute>() is not null;
-        });
 
-        if (!subcommandProp.PropertyType.IsEnum)
-            throw new MemberAccessException("subcommand is not of enum type");
-
-        foreach (var enumVal in Enum.GetValues(subcommandProp.PropertyType))
+        foreach (var subCmd in Subcommands)
         {
-            var name = enumVal.ToString()!.ToKebabCase();
-            if (name != "unset") subcommands += $"\t{name}\n";
+            var name = subCmd.Name.TrimEnd("Subcommand").TrimEnd("Options").ToLower();
+            var desc = subCmd.GetCustomAttribute<SubcommandAttribute>()!.Desc;
+            subcommands += $"\t{name}\t{desc}\n";
         }
 
-        foreach (var prop in Meta.FlagProps)
+        foreach (var prop in meta.FlagProps)
         {
             var attr = prop.GetCustomAttribute<FlagAttribute>()!;
             var longName = prop.Name.ToKebabCase();
             var shortName = attr.ShortName;
             var desc = attr.Description;
-            usage += $"\t--{longName}, -{shortName}\t {desc}\n";
+            options += $"\t--{longName}, -{shortName}\t {desc}\n";
         }
 
-        return $"{header}\n{Options.Description}\n\n{subcommands}\n{usage}";
-    }
-
-    private static void ParseLongFlag(T inst, string arg)
-    {
-        var (name, value) = ArgKeyValue(arg);
-        var argProp = Meta.FlagProps.First(prop => prop.Name.Equals(name));
-
-        if (argProp != null && argProp.PropertyType.Equals(typeof(bool)))
-        {
-            argProp.SetValue(inst, true);
-        }
-        else if (argProp != null && argProp.PropertyType.Equals(typeof(string)))
-        {
-            argProp.SetValue(inst, value ?? string.Empty);
-        }
-        else
-        {
-            throw new ArgumentException($"unknown '{name}' flag");
-        }
-    }
-
-    private static void ParseShortFlag(T inst, string arg)
-    {
-        var name = arg[1..];
-
-        for (int i = 0; i < name.Length; i++)
-        {
-            char ch = name[i];
-            var argProp = Meta.FlagProps.First(prop =>
-            {
-                var attr = prop.GetCustomAttribute<FlagAttribute>();
-                return ValidateShortFlagAttr(attr, prop, ch);
-            });
-
-            if (argProp != null && argProp.PropertyType.Equals(typeof(bool)))
-            {
-                argProp.SetValue(inst, true);
-            }
-            else if (argProp != null && argProp.PropertyType.Equals(typeof(string)))
-            {
-                if (i > 0)
-                {
-                    throw new ArgumentException("invalid flag position");
-                }
-                else if (arg.Length > 1)
-                {
-                    argProp.SetValue(inst, arg[2..]);
-                }
-                else
-                {
-                    argProp.SetValue(inst, "");
-                }
-
-                break;
-            }
-        }
-    }
-
-    private static (string, string?) ArgKeyValue(string arg)
-    {
-        var eqIndex = arg.IndexOf('=');
-        var upTo = eqIndex == -1 ? arg.Length : eqIndex;
-        var name = arg[2..upTo].ToPascalCase();
-        var value = eqIndex == -1 ? null : arg[(eqIndex + 1)..arg.Length];
-        return (name, value);
-    }
-
-    private static bool ValidateShortFlagAttr(FlagAttribute? attr, PropertyInfo prop, char ch)
-    {
-        if (attr is null) return false;
-
-        if (attr.ShortName is not null)
-        {
-            if (attr.ShortName.Length != 1)
-                throw new ArgumentException("short flag name should be 1 character long");
-
-            var a = attr.ShortName.First().Equals(ch);
-            var b = attr.ShortName.First().ToLowerCase().Equals(prop.Name.First().ToLowerCase());
-            return a && b;
-        }
-
-        return prop.Name.First().ToLowerCase().Equals(ch);
+        return $"{header}\n{Options.Description}\n\n{subcommands}\n{options}";
     }
 }
 
@@ -190,4 +123,3 @@ public class ClapOptions
     public string Licence { get; set; } = "MIT";
     public string Description { get; set; } = string.Empty;
 }
-

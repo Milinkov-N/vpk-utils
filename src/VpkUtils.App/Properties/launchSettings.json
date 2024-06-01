@@ -2,12 +2,12 @@
   "profiles": {
     "VpkUtils.App": {
       "commandName": "Project",
-      "commandLineArgs": "rename -dvt -sмай",
+      "commandLineArgs": "-sмай rename -dvt",
       "workingDirectory": "C:\\Users\\milin\\source\\repos\\vpk-utils\\src\\VpkUtils.App"
     },
     "VpkUtils.App.CheckSize": {
       "commandName": "Project",
-      "commandLineArgs": "check-size -sмай"
+      "commandLineArgs": "-sмай check-size"
     }
   }
 }
